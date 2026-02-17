@@ -48,3 +48,8 @@ __pycache__/
 *.exe
 *.dylib
 *.so
+go-jamf-guid-sharder
+
+# Local test configs (contain credentials)
+local-test.yaml
+*.local.yaml

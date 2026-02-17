@@ -1,75 +1,113 @@
-# Template
+# go-jamf-guid-sharder
 
-This repository serves as a **Default Template Repository** according official [GitHub Contributing Guidelines][ProjectSetup] for healthy contributions. It brings you clean default Templates for several areas:
+A CLI tool that retrieves managed device and user IDs from Jamf Pro and distributes them into configurable shards for progressive rollouts and phased deployments.
 
-- [Azure DevOps Pull Requests](.azuredevops/PULL_REQUEST_TEMPLATE.md) ([`.azuredevops\PULL_REQUEST_TEMPLATE.md`](`.azuredevops\PULL_REQUEST_TEMPLATE.md`))
-- [Azure Pipelines](.pipelines/pipeline.yml) ([`.pipelines/pipeline.yml`](`.pipelines/pipeline.yml`))
-- [GitHub Workflows](.github/workflows/)
-  - [Super Linter](.github/workflows/linter.yml) ([`.github/workflows/linter.yml`](`.github/workflows/linter.yml`))
-  - [Sample Workflows](.github/workflows/workflow.yml) ([`.github/workflows/workflow.yml`](`.github/workflows/workflow.yml`))
-- [GitHub Pull Requests](.github/PULL_REQUEST_TEMPLATE.md) ([`.github/PULL_REQUEST_TEMPLATE.md`](`.github/PULL_REQUEST_TEMPLATE.md`))
-- [GitHub Issues](.github/ISSUE_TEMPLATE/)
-  - [Feature Requests](.github/ISSUE_TEMPLATE/FEATURE_REQUEST.md) ([`.github/ISSUE_TEMPLATE/FEATURE_REQUEST.md`](`.github/ISSUE_TEMPLATE/FEATURE_REQUEST.md`))
-  - [Bug Reports](.github/ISSUE_TEMPLATE/BUG_REPORT.md) ([`.github/ISSUE_TEMPLATE/BUG_REPORT.md`](`.github/ISSUE_TEMPLATE/BUG_REPORT.md`))
-- [Codeowners](.github/CODEOWNERS) ([`.github/CODEOWNERS`](`.github/CODEOWNERS`)) _adjust usernames once cloned_
-- [Wiki and Documentation](docs/) ([`docs/`](`docs/`))
-- [gitignore](.gitignore) ([`.gitignore`](.gitignore))
-- [gitattributes](.gitattributes) ([`.gitattributes`](.gitattributes))
-- [Changelog](CHANGELOG.md) ([`CHANGELOG.md`](`CHANGELOG.md`))
-- [Code of Conduct](CODE_OF_CONDUCT.md) ([`CODE_OF_CONDUCT.md`](`CODE_OF_CONDUCT.md`))
-- [Contribution](CONTRIBUTING.md) ([`CONTRIBUTING.md`](`CONTRIBUTING.md`))
-- [License](LICENSE) ([`LICENSE`](`LICENSE`)) _adjust projectname once cloned_
-- [Readme](README.md) ([`README.md`](`README.md`))
-- [Security](SECURITY.md) ([`SECURITY.md`](`SECURITY.md`))
+[![Go Test](https://github.com/deploymenttheory/go-jamf-guid-sharder/actions/workflows/go-test.yml/badge.svg)](https://github.com/deploymenttheory/go-jamf-guid-sharder/actions/workflows/go-test.yml)
+[![Go Lint](https://github.com/deploymenttheory/go-jamf-guid-sharder/actions/workflows/go-lint.yml/badge.svg)](https://github.com/deploymenttheory/go-jamf-guid-sharder/actions/workflows/go-lint.yml)
+[![Release](https://github.com/deploymenttheory/go-jamf-guid-sharder/actions/workflows/release.yml/badge.svg)](https://github.com/deploymenttheory/go-jamf-guid-sharder/actions/workflows/release.yml)
+[![License](https://img.shields.io/github/license/deploymenttheory/go-jamf-guid-sharder)](LICENSE)
 
+## What it does
 
-## Status
+`go-jamf-guid-sharder` connects to Jamf Pro, fetches a set of managed device or user IDs, and splits them into named shards using one of four algorithms. The output is JSON or YAML — ready to pipe into a deployment tool, Terraform data source, or further automation.
 
-[![Super Linter](<https://github.com/segraef/Template/actions/workflows/linter.yml/badge.svg>)](<https://github.com/segraef/Template/actions/workflows/linter.yml>)
+```
+Jamf Pro API  →  fetch IDs  →  exclude / reserve  →  shard  →  JSON / YAML
+```
 
-[![Sample Workflow](<https://github.com/segraef/Template/actions/workflows/workflow.yml/badge.svg>)](<https://github.com/segraef/Template/actions/workflows/workflow.yml>)
+**Supported sources**
 
-## Creating a repository from a template
+| `source_type` | API used | Notes |
+|---|---|---|
+| `computer_inventory` | Pro API | Managed computers only |
+| `mobile_device_inventory` | Pro API | Managed mobile devices only |
+| `computer_group_membership` | Classic API | Requires `--group-id` |
+| `mobile_device_group_membership` | Classic API | Requires `--group-id` |
+| `user_accounts` | Classic API | All Jamf Pro user accounts |
 
-You can [generate](https://github.com/segraef/Template/generate) a new repository with the same directory structure and files as an existing repository. More details can be found [here][CreateFromTemplate].
+**Supported strategies**
 
-## Reporting Issues and Feedback
+| Strategy | Description |
+|---|---|
+| `round-robin` | Equal distribution ±1, optionally seeded |
+| `percentage` | Proportional split by explicit percentages summing to 100 |
+| `size` | Absolute shard sizes; use `-1` as final element for remainder |
+| `rendezvous` | Highest Random Weight (HRW) consistent hashing — minimal movement when shard count changes |
 
-### Issues and Bugs
+## Quick start
 
-If you find any bugs, please file an issue in the [GitHub Issues][GitHubIssues] page. Please fill out the provided template with the appropriate information.
+```bash
+# Download the latest release binary (macOS arm64 example)
+curl -L https://github.com/deploymenttheory/go-jamf-guid-sharder/releases/latest/download/go-jamf-guid-sharder_latest_darwin_arm64.tar.gz | tar xz
 
-If you are taking the time to mention a problem, even a seemingly minor one, it is greatly appreciated, and a totally valid contribution to this project. **Thank you!**
+# Run a round-robin split of all managed computers into 3 shards
+./go-jamf-guid-sharder shard \
+  --instance-domain company.jamfcloud.com \
+  --auth-method oauth2 \
+  --client-id <id> --client-secret <secret> \
+  --source-type computer_inventory \
+  --strategy round-robin --shard-count 3
+```
 
-## Feedback
+Output:
 
-If there is a feature you would like to see in here, please file an issue or feature request in the [GitHub Issues][GitHubIssues] page to provide direct feedback.
+```json
+{
+  "metadata": {
+    "generated_at": "2024-11-01T09:15:42Z",
+    "source_type": "computer_inventory",
+    "strategy": "round-robin",
+    "seed": "",
+    "total_ids_fetched": 1200,
+    "excluded_id_count": 0,
+    "reserved_id_count": 0,
+    "unreserved_ids_distributed": 1200,
+    "shard_count": 3
+  },
+  "shards": {
+    "shard_0": ["1", "4", "7"],
+    "shard_1": ["2", "5", "8"],
+    "shard_2": ["3", "6", "9"]
+  }
+}
+```
 
-## Contribution
+## Documentation
 
-If you would like to become an active contributor to this repository or project, please follow the instructions provided in [`CONTRIBUTING.md`][Contributing].
+| Topic | Description |
+|---|---|
+| [Getting started](docs/getting-started.md) | Installation, first run, config file setup |
+| [Configuration reference](docs/configuration.md) | Every field and flag explained |
+| [Sharding strategies](docs/strategies.md) | How each algorithm works, when to use it |
+| [Examples](docs/examples.md) | Real-world patterns for common rollout scenarios |
 
-## Learn More
+## Configuration
 
-* [GitHub Documentation][GitHubDocs]
-* [Azure DevOps Documentation][AzureDevOpsDocs]
-* [Microsoft Azure Documentation][MicrosoftAzureDocs]
+Configuration is resolved in priority order: **flags > config file > environment variables**.
 
-<!-- References -->
+Copy `workload/example-config.yaml` as a starting point:
 
-<!-- Local -->
-[ProjectSetup]: <https://docs.github.com/en/communities/setting-up-your-project-for-healthy-contributions>
-[CreateFromTemplate]: <https://docs.github.com/en/github/creating-cloning-and-archiving-repositories/creating-a-repository-on-github/creating-a-repository-from-a-template>
-[GitHubDocs]: <https://docs.github.com/>
-[AzureDevOpsDocs]: <https://docs.microsoft.com/en-us/azure/devops/?view=azure-devops>
-[GitHubIssues]: <https://github.com/segraef/Template/issues>
-[Contributing]: CONTRIBUTING.md
+```yaml
+instance_domain: "https://company.jamfcloud.com"
+auth_method: "oauth2"
+client_id: ""
+client_secret: ""
 
-<!-- External -->
-[Az]: <https://img.shields.io/powershellgallery/v/Az.svg?style=flat-square&label=Az>
-[AzGallery]: <https://www.powershellgallery.com/packages/Az/>
-[PowerShellCore]: <https://github.com/PowerShell/PowerShell/releases/latest>
+source_type: "computer_inventory"
+strategy: "round-robin"
+shard_count: 3
 
-<!-- Docs -->
-[MicrosoftAzureDocs]: <https://docs.microsoft.com/en-us/azure/>
-[PowerShellDocs]: <https://docs.microsoft.com/en-us/powershell/>
+output_format: "json"
+```
+
+Environment variables use the prefix `JAMF_`, e.g. `JAMF_CLIENT_SECRET`.
+
+See the full [configuration reference](docs/configuration.md) for every available field.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). Issues and pull requests are welcome.
+
+## License
+
+[MIT](LICENSE)

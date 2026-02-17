@@ -1,0 +1,73 @@
+version: 2
+
+project_name: go-jamf-guid-sharder
+
+before:
+  hooks:
+    - go mod tidy
+    - go mod verify
+
+builds:
+  - id: go-jamf-guid-sharder
+    main: ./main.go
+    binary: go-jamf-guid-sharder
+
+    # Stamp the version into cmd.Version at link time.
+    ldflags:
+      - -s -w
+      - -X github.com/deploymenttheory/go-jamf-guid-sharder/cmd.Version={{.Version}}
+
+    env:
+      - CGO_ENABLED=0
+
+    goos:
+      - linux
+      - darwin
+      - windows
+
+    goarch:
+      - amd64
+      - arm64
+
+    # Windows arm64 is uncommon for ops tooling; skip it.
+    ignore:
+      - goos: windows
+        goarch: arm64
+
+archives:
+  - id: go-jamf-guid-sharder
+    builds:
+      - go-jamf-guid-sharder
+
+    # tar.gz for Unix, zip for Windows (native tooling expects .zip).
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+
+    # Bundle the example config alongside the binary.
+    files:
+      - workload/example-config.yaml
+      - LICENSE
+      - README.md
+
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+
+checksum:
+  name_template: "{{ .ProjectName }}_{{ .Version }}_checksums.txt"
+  algorithm: sha256
+
+changelog:
+  # Delegate changelog content to release-please; GoReleaser just uses what
+  # GitHub already has on the release object.
+  disable: true
+
+release:
+  # Publish to the GitHub release that release-please created.
+  github:
+    owner: deploymenttheory
+    name: go-jamf-guid-sharder
+
+  # Do not overwrite the release notes that release-please wrote.
+  prerelease: auto
+  make_latest: true

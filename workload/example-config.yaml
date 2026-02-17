@@ -1,0 +1,76 @@
+# go-jamf-guid-sharder sample configuration file
+# Copy to ./go-jamf-guid-sharder.yaml (or pass via --config) and fill in your values.
+# All fields can also be overridden with environment variables prefixed JAMF_
+# e.g. JAMF_INSTANCE_DOMAIN, JAMF_CLIENT_ID, JAMF_CLIENT_SECRET
+
+# ── Authentication ─────────────────────────────────────────────────────────────
+instance_domain: "https://company.jamfcloud.com"
+auth_method: "oauth2"                       # "oauth2" or "basic"
+
+# OAuth2 (recommended)
+client_id: ""
+client_secret: ""
+
+# Basic auth (alternative — only used when auth_method is "basic")
+basic_auth_username: ""
+basic_auth_password: ""
+
+# ── HTTP client tuning ─────────────────────────────────────────────────────────
+log_level: "warn"                           # debug | info | warn | error | fatal
+log_export_path: ""                         # optional: write logs to this file
+hide_sensitive_data: true                   # redact secrets from log output
+jamf_load_balancer_lock: false              # lock requests to one LB node
+
+max_retry_attempts: 3
+max_concurrent_requests: 1
+enable_dynamic_rate_limiting: false
+custom_timeout_seconds: 60
+token_refresh_buffer_period_seconds: 300
+total_retry_duration_seconds: 60
+follow_redirects: true
+max_redirects: 5
+enable_concurrency_management: true
+mandatory_request_delay_milliseconds: 0
+retry_eligiable_requests: true
+
+# ── Sharding ───────────────────────────────────────────────────────────────────
+# source_type selects the Jamf Pro data to shard:
+#   computer_inventory              — all managed computers (Pro API)
+#   mobile_device_inventory         — all managed mobile devices (Pro API)
+#   computer_group_membership       — members of a computer group (Classic API, requires group_id)
+#   mobile_device_group_membership  — members of a mobile device group (Classic API, requires group_id)
+#   user_accounts                   — all Jamf Pro user accounts (Classic API)
+source_type: "computer_inventory"
+group_id: ""   # required when source_type is *_group_membership
+
+# strategy selects the distribution algorithm:
+#   round-robin  — equal distribution ±1, requires shard_count
+#   percentage   — proportional by percentage, requires shard_percentages
+#   size         — absolute sizes, requires shard_sizes
+#   rendezvous   — HRW consistent hashing, requires shard_count
+strategy: "round-robin"
+
+shard_count: 3          # used by round-robin and rendezvous
+
+# shard_percentages: [10, 30, 60]   # must sum to 100; used by percentage strategy
+# shard_sizes: [50, 200, -1]        # -1 = all remaining; used by size strategy
+
+seed: ""   # set any string for deterministic (reproducible) distribution
+
+# IDs to completely remove from all shards before any strategy is applied.
+# exclude_ids:
+#   - "1001"
+#   - "1002"
+
+# Pin specific IDs to specific shards (removed from the main pool first, then
+# appended to their designated shard after the strategy runs).
+# reserved_ids:
+#   shard_0:
+#     - "101"
+#     - "102"
+#   shard_2:
+#     - "201"
+
+# ── Output ─────────────────────────────────────────────────────────────────────
+output_format: "json"   # "json" or "yaml"
+output_file: ""         # leave empty to write to stdout
