@@ -635,8 +635,23 @@ func TestBuildJamfClient_Integration(t *testing.T) {
 }
 
 func TestBuildJamfClient_BasicAuth(t *testing.T) {
-	server, cleanup := setupIntegrationTest(t)
-	defer cleanup()
+	handlers := map[string]http.HandlerFunc{
+		"/api/v1/auth/token": func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"token":   "mock-basic-token",
+				"expires": "2026-03-11T23:59:59Z",
+			})
+		},
+	}
+
+	mux := http.NewServeMux()
+	for path, handler := range handlers {
+		mux.HandleFunc(path, handler)
+	}
+
+	server := httptest.NewServer(mux)
+	defer server.Close()
 
 	cfg := &shardConfig{
 		InstanceDomain: server.URL,
