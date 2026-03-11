@@ -61,5 +61,3 @@ require (
 	howett.net/plist v1.0.1 // indirect
 	resty.dev/v3 v3.0.0-beta.6 // indirect
 )
-
-replace github.com/deploymenttheory/go-sdk-jamfpro-v2 => /Users/dafyddwatkins/GitHub/deploymenttheory/go-sdk-jamfpro-v2
