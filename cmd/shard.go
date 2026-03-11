@@ -1,14 +1,14 @@
 package cmd
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
-	"net/url"
 	"os"
 	"strconv"
 	"time"
 
-	"github.com/deploymenttheory/go-api-sdk-jamfpro/sdk/jamfpro"
+	"github.com/deploymenttheory/go-sdk-jamfpro-v2/jamfpro"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"gopkg.in/yaml.v3"
@@ -98,37 +98,37 @@ e.g. '{"shard_0":["101","102"],"shard_2":["201"]}'`)
 // and config file values are all resolved through a single viper lookup.
 func bindShardFlags(cmd *cobra.Command) {
 	pairs := map[string]string{
-		"instance-domain":              "instance_domain",
-		"auth-method":                  "auth_method",
-		"client-id":                    "client_id",
-		"client-secret":                "client_secret",
-		"username":                     "basic_auth_username",
-		"password":                     "basic_auth_password",
-		"log-level":                    "log_level",
-		"log-export-path":              "log_export_path",
-		"hide-sensitive-data":          "hide_sensitive_data",
-		"jamf-load-balancer-lock":      "jamf_load_balancer_lock",
-		"max-retry-attempts":           "max_retry_attempts",
-		"max-concurrent-requests":      "max_concurrent_requests",
-		"enable-dynamic-rate-limiting": "enable_dynamic_rate_limiting",
-		"custom-timeout":               "custom_timeout_seconds",
-		"token-refresh-buffer":         "token_refresh_buffer_period_seconds",
-		"total-retry-duration":         "total_retry_duration_seconds",
-		"follow-redirects":             "follow_redirects",
-		"max-redirects":                "max_redirects",
+		"instance-domain":               "instance_domain",
+		"auth-method":                   "auth_method",
+		"client-id":                     "client_id",
+		"client-secret":                 "client_secret",
+		"username":                      "basic_auth_username",
+		"password":                      "basic_auth_password",
+		"log-level":                     "log_level",
+		"log-export-path":               "log_export_path",
+		"hide-sensitive-data":           "hide_sensitive_data",
+		"jamf-load-balancer-lock":       "jamf_load_balancer_lock",
+		"max-retry-attempts":            "max_retry_attempts",
+		"max-concurrent-requests":       "max_concurrent_requests",
+		"enable-dynamic-rate-limiting":  "enable_dynamic_rate_limiting",
+		"custom-timeout":                "custom_timeout_seconds",
+		"token-refresh-buffer":          "token_refresh_buffer_period_seconds",
+		"total-retry-duration":          "total_retry_duration_seconds",
+		"follow-redirects":              "follow_redirects",
+		"max-redirects":                 "max_redirects",
 		"enable-concurrency-management": "enable_concurrency_management",
-		"mandatory-request-delay":      "mandatory_request_delay_milliseconds",
-		"retry-eligible-requests":      "retry_eligiable_requests",
-		"source-type":                  "source_type",
-		"group-id":                     "group_id",
-		"strategy":                     "strategy",
-		"shard-count":                  "shard_count",
-		"shard-percentages":            "shard_percentages",
-		"shard-sizes":                  "shard_sizes",
-		"seed":                         "seed",
-		"exclude-ids":                  "exclude_ids",
-		"output":                       "output_format",
-		"output-file":                  "output_file",
+		"mandatory-request-delay":       "mandatory_request_delay_milliseconds",
+		"retry-eligible-requests":       "retry_eligiable_requests",
+		"source-type":                   "source_type",
+		"group-id":                      "group_id",
+		"strategy":                      "strategy",
+		"shard-count":                   "shard_count",
+		"shard-percentages":             "shard_percentages",
+		"shard-sizes":                   "shard_sizes",
+		"seed":                          "seed",
+		"exclude-ids":                   "exclude_ids",
+		"output":                        "output_format",
+		"output-file":                   "output_file",
 	}
 	for flag, key := range pairs {
 		if f := cmd.Flags().Lookup(flag); f != nil {
@@ -224,32 +224,37 @@ func runShard(cmd *cobra.Command, _ []string) error {
 // ── Client construction ───────────────────────────────────────────────────────
 
 // buildJamfClient constructs a jamfpro.Client from the resolved shardConfig,
-// mapping directly onto jamfpro.ConfigContainer fields.
+// mapping configuration to SDK v2's AuthConfig and ClientOptions.
 func buildJamfClient(cfg *shardConfig) (*jamfpro.Client, error) {
-	container := &jamfpro.ConfigContainer{
-		InstanceDomain:              cfg.InstanceDomain,
-		AuthMethod:                  cfg.AuthMethod,
-		ClientID:                    cfg.ClientID,
-		ClientSecret:                cfg.ClientSecret,
-		Username:                    cfg.Username,
-		Password:                    cfg.Password,
-		LogLevel:                    cfg.LogLevel,
-		LogExportPath:               cfg.LogExportPath,
-		HideSensitiveData:           cfg.HideSensitiveData,
-		JamfLoadBalancerLock:        cfg.JamfLoadBalancerLock,
-		MaxRetryAttempts:            cfg.MaxRetryAttempts,
-		MaxConcurrentRequests:       cfg.MaxConcurrentRequests,
-		EnableDynamicRateLimiting:   cfg.EnableDynamicRateLimiting,
-		CustomTimeout:               cfg.CustomTimeout,
-		TokenRefreshBufferPeriod:    cfg.TokenRefreshBufferPeriod,
-		TotalRetryDuration:          cfg.TotalRetryDuration,
-		FollowRedirects:             cfg.FollowRedirects,
-		MaxRedirects:                cfg.MaxRedirects,
-		EnableConcurrencyManagement: cfg.EnableConcurrencyManagement,
-		MandatoryRequestDelay:       cfg.MandatoryRequestDelay,
-		RetryEligiableRequests:      cfg.RetryEligiableRequests,
+	authConfig := &jamfpro.AuthConfig{
+		InstanceDomain:           cfg.InstanceDomain,
+		AuthMethod:               cfg.AuthMethod,
+		ClientID:                 cfg.ClientID,
+		ClientSecret:             cfg.ClientSecret,
+		Username:                 cfg.Username,
+		Password:                 cfg.Password,
+		TokenRefreshBufferPeriod: time.Duration(cfg.TokenRefreshBufferPeriod) * time.Second,
+		HideSensitiveData:        cfg.HideSensitiveData,
 	}
-	return jamfpro.BuildClient(container)
+
+	var options []jamfpro.ClientOption
+	if cfg.CustomTimeout > 0 {
+		options = append(options, jamfpro.WithTimeout(time.Duration(cfg.CustomTimeout)*time.Second))
+	}
+	if cfg.MaxRetryAttempts > 0 {
+		options = append(options, jamfpro.WithRetryCount(cfg.MaxRetryAttempts))
+	}
+	if cfg.MaxConcurrentRequests > 0 {
+		options = append(options, jamfpro.WithMaxConcurrentRequests(cfg.MaxConcurrentRequests))
+	}
+	if cfg.MandatoryRequestDelay > 0 {
+		options = append(options, jamfpro.WithMandatoryRequestDelay(time.Duration(cfg.MandatoryRequestDelay)*time.Millisecond))
+	}
+	if cfg.TotalRetryDuration > 0 {
+		options = append(options, jamfpro.WithTotalRetryDuration(time.Duration(cfg.TotalRetryDuration)*time.Second))
+	}
+
+	return jamfpro.NewClient(authConfig, options...)
 }
 
 // ── ID fetching ───────────────────────────────────────────────────────────────
@@ -277,10 +282,16 @@ func fetchSourceIDs(client *jamfpro.Client, cfg *shardConfig) ([]string, error) 
 // Unmanaged computers are excluded because they cannot be members of a
 // Jamf Pro static group.
 func fetchComputerInventory(client *jamfpro.Client) ([]string, error) {
-	params := url.Values{}
-	params.Set("section", "GENERAL")
+	ctx := context.Background()
+	rsqlQuery := map[string]string{
+		"section": "GENERAL",
+	}
 
-	computers, err := client.GetComputersInventory(params)
+	computers, _, err := client.
+		JamfProAPI.
+		ComputerInventory.
+		ListV3(ctx, rsqlQuery)
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve computer inventory: %w", err)
 	}
@@ -297,13 +308,19 @@ func fetchComputerInventory(client *jamfpro.Client) ([]string, error) {
 // fetchMobileDeviceInventory returns IDs for all managed mobile devices.
 // Unmanaged devices are excluded for the same reason as unmanaged computers.
 func fetchMobileDeviceInventory(client *jamfpro.Client) ([]string, error) {
-	devices, err := client.GetMobileDevices()
+	ctx := context.Background()
+
+	devices, _, err := client.
+		ClassicAPI.
+		MobileDevices.
+		List(ctx)
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve mobile devices: %w", err)
 	}
 
 	var ids []string
-	for _, d := range devices.MobileDevices {
+	for _, d := range devices.Results {
 		if d.Managed {
 			ids = append(ids, strconv.Itoa(d.ID))
 		}
@@ -313,45 +330,67 @@ func fetchMobileDeviceInventory(client *jamfpro.Client) ([]string, error) {
 
 // fetchComputerGroupMembers returns the IDs of all computers in the given group.
 func fetchComputerGroupMembers(client *jamfpro.Client, groupID string) ([]string, error) {
-	group, err := client.GetComputerGroupByID(groupID)
+	ctx := context.Background()
+	id, err := strconv.Atoi(groupID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid group ID %q: must be numeric", groupID)
+	}
+
+	group, _, err := client.
+		ClassicAPI.
+		ComputerGroups.
+		GetByID(ctx, id)
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve computer group %s: %w", groupID, err)
 	}
 
 	var ids []string
-	if group.Computers != nil {
-		for _, c := range *group.Computers {
-			ids = append(ids, strconv.Itoa(c.ID))
-		}
+	for _, c := range group.Computers {
+		ids = append(ids, strconv.Itoa(c.ID))
 	}
 	return ids, nil
 }
 
 // fetchMobileDeviceGroupMembers returns the IDs of all mobile devices in the given group.
 func fetchMobileDeviceGroupMembers(client *jamfpro.Client, groupID string) ([]string, error) {
-	group, err := client.GetMobileDeviceGroupByID(groupID)
+	ctx := context.Background()
+	id, err := strconv.Atoi(groupID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid group ID %q: must be numeric", groupID)
+	}
+
+	group, _, err := client.
+		ClassicAPI.
+		MobileDeviceGroups.
+		GetByID(ctx, id)
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve mobile device group %s: %w", groupID, err)
 	}
 
 	var ids []string
-	if group.MobileDevices != nil {
-		for _, d := range *group.MobileDevices {
-			ids = append(ids, strconv.Itoa(d.ID))
-		}
+	for _, d := range group.MobileDevices {
+		ids = append(ids, strconv.Itoa(d.ID))
 	}
 	return ids, nil
 }
 
 // fetchUsers returns the IDs of all Jamf Pro user accounts.
 func fetchUsers(client *jamfpro.Client) ([]string, error) {
-	users, err := client.GetUsers()
+	ctx := context.Background()
+
+	users, _, err := client.
+		ClassicAPI.
+		Users.
+		List(ctx)
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve users: %w", err)
 	}
 
 	var ids []string
-	for _, u := range users.Users {
+	for _, u := range users.Results {
 		ids = append(ids, strconv.Itoa(u.ID))
 	}
 	return ids, nil
