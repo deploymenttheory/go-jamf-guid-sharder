@@ -4,6 +4,7 @@ A CLI tool that retrieves managed device and user IDs from Jamf Pro and distribu
 
 [![Go Test](https://github.com/deploymenttheory/go-jamf-guid-sharder/actions/workflows/go-test.yml/badge.svg)](https://github.com/deploymenttheory/go-jamf-guid-sharder/actions/workflows/go-test.yml)
 [![Go Lint](https://github.com/deploymenttheory/go-jamf-guid-sharder/actions/workflows/go-lint.yml/badge.svg)](https://github.com/deploymenttheory/go-jamf-guid-sharder/actions/workflows/go-lint.yml)
+[![codecov](https://codecov.io/gh/deploymenttheory/go-jamf-guid-sharder/graph/badge.svg)](https://codecov.io/gh/deploymenttheory/go-jamf-guid-sharder)
 [![Release](https://github.com/deploymenttheory/go-jamf-guid-sharder/actions/workflows/release.yml/badge.svg)](https://github.com/deploymenttheory/go-jamf-guid-sharder/actions/workflows/release.yml)
 [![License](https://img.shields.io/github/license/deploymenttheory/go-jamf-guid-sharder)](LICENSE)
 
