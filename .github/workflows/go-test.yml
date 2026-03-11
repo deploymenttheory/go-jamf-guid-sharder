@@ -79,9 +79,9 @@ jobs:
           passed_tests=$(grep -c "^--- PASS:" test_output.txt || echo "0")
           failed_tests=$(grep -c "^--- FAIL:" test_output.txt || echo "0")
           
-          printf "%-30s %5d\n" "Total Tests:" "$total_tests"
-          printf "%-30s %5d\n" "Passed:" "$passed_tests"
-          printf "%-30s %5d\n" "Failed:" "$failed_tests"
+          echo "Total Tests:                  $total_tests"
+          echo "Passed:                       $passed_tests"
+          echo "Failed:                       $failed_tests"
           
           # Cleanup temp files
           rm -f test_output.txt

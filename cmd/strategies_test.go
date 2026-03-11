@@ -699,3 +699,62 @@ func findIDShard(id string, shards [][]string) int {
 	}
 	return -1
 }
+
+// ── Additional Coverage Tests ─────────────────────────────────────────────────
+
+func TestShardByPercentage_NegativeShardSize(t *testing.T) {
+	ids := createTestIDs(20, 1)
+	percentages := []int{60, 30, 10}
+	reservations := &shardReservations{
+		IDsByShard: map[string][]string{
+			"shard_0": createTestIDs(15, 100),
+		},
+		CountsByShard: map[int]int{
+			0: 15,
+		},
+		UnreservedIDs: ids,
+	}
+
+	shards := shardByPercentage(ids, percentages, "", reservations)
+
+	require.Len(t, shards, 3)
+	totalIDs := 0
+	for _, shard := range shards {
+		totalIDs += len(shard)
+	}
+	assert.Equal(t, 35, totalIDs, "Should have 20 unreserved + 15 reserved")
+}
+
+func TestShardByPercentage_MultipleReservations(t *testing.T) {
+	ids := createTestIDs(100, 1)
+	percentages := []int{25, 25, 25, 25}
+	reservations := &shardReservations{
+		IDsByShard: map[string][]string{
+			"shard_0": {"1000", "1001"},
+			"shard_1": {"2000"},
+			"shard_2": {"3000", "3001", "3002"},
+			"shard_3": {"4000"},
+		},
+		CountsByShard: map[int]int{
+			0: 2,
+			1: 1,
+			2: 3,
+			3: 1,
+		},
+		UnreservedIDs: ids,
+	}
+
+	shards := shardByPercentage(ids, percentages, "multi-reserve", reservations)
+
+	require.Len(t, shards, 4)
+	assert.Contains(t, shards[0], "1000")
+	assert.Contains(t, shards[1], "2000")
+	assert.Contains(t, shards[2], "3000")
+	assert.Contains(t, shards[3], "4000")
+	
+	totalIDs := 0
+	for _, shard := range shards {
+		totalIDs += len(shard)
+	}
+	assert.Equal(t, 107, totalIDs, "Should have 100 unreserved + 7 reserved")
+}
