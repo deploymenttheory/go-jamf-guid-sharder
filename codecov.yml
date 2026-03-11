@@ -1,0 +1,95 @@
+# Codecov configuration for go-jamf-guid-sharder
+# For more info: https://docs.codecov.io/docs/codecov-yaml
+
+codecov:
+  bot: "codecov-io"
+  require_ci_to_pass: true
+  max_report_age: 24h
+  notify:
+    after_n_builds: 1
+    wait_for_ci: true
+
+coverage:
+  precision: 2
+  round: down
+  range: "60...90"
+
+  status:
+    project:
+      default:
+        target: auto
+        threshold: 2%
+        base: auto
+        branches:
+          - main
+        if_ci_failed: error
+        informational: true
+
+    patch:
+      default:
+        target: 80%
+        threshold: 5%
+        base: auto
+        branches:
+          - main
+        if_ci_failed: ignore
+        informational: true
+
+# Flags for different components
+flags:
+  unittests:
+    paths:
+      - "cmd/"
+    carryforward: false
+
+  commands:
+    paths:
+      - "cmd/"
+    carryforward: false
+
+  strategies:
+    paths:
+      - "cmd/strategies.go"
+    carryforward: false
+
+  validation:
+    paths:
+      - "cmd/validate.go"
+    carryforward: false
+
+# Ignore paths that shouldn't count towards coverage
+ignore:
+  - "docs/"
+  - "docs/**"
+  - "workload/"
+  - "workload/**"
+  - "examples/"
+  - "examples/**"
+  - "**/*_test.go"
+  - "**/testdata/**"
+  - "*.md"
+  - "*.json"
+  - "*.yaml"
+  - "*.yml"
+  - "go.mod"
+  - "go.sum"
+  - "main.go"
+
+# Parser settings for Go
+parsers:
+  go:
+    partials_as_hits: false
+
+# Pull request comment configuration
+comment:
+  layout: "diff, flags, files"
+  behavior: default
+  require_changes: false
+  require_base: false
+  require_head: true
+  branches:
+    - main
+
+# GitHub Checks annotations
+github_checks:
+  annotations: true

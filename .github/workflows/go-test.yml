@@ -12,6 +12,8 @@ on:
 
 permissions:
   contents: read
+  pull-requests: write
+  issues: write
 
 jobs:
   test:
@@ -26,6 +28,8 @@ jobs:
 
       - name: Check Out
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
 
       - name: Set up Go
         uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0
@@ -34,14 +38,94 @@ jobs:
           cache-dependency-path: 'go.sum'
           cache: true
 
-      - name: Verify modules
-        run: go mod verify
+      - name: Download Dependencies
+        run: |
+          echo "::group::📦 Downloading Go modules"
+          go mod download
+          go mod verify
+          echo "::endgroup::"
 
       - name: Build
         run: go build ./...
 
-      - name: Test
-        run: go test -v -race -count=1 ./...
+      - name: Run Unit Tests
+        run: |
+          echo "::group::🧪 Unit Tests Setup"
+          echo "========================================================================"
+          echo "  Running Unit Tests with Coverage"
+          echo "========================================================================"
+          echo "::endgroup::"
+          echo ""
+
+          go test -v -race -coverprofile=coverage.out -covermode=atomic ./... 2>&1 | tee test_output.txt
+
+          echo ""
+          echo "::group::📊 Coverage Summary"
+          go tool cover -func=coverage.out | tail -1
+          echo "::endgroup::"
+
+      - name: Generate Coverage Report
+        if: always()
+        run: |
+          echo "::group::📈 Detailed Coverage Report"
+          go tool cover -func=coverage.out
+          echo "::endgroup::"
+
+      - name: Upload coverage reports to Codecov
+        if: always()
+        uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # v5.5.2
+        with:
+          token: ${{ secrets.CODECOV_TOKEN || '' }}
+          slug: deploymenttheory/go-jamf-guid-sharder
+          files: ./coverage.out
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
+          verbose: true
+
+      - name: Upload Coverage Artifact
+        if: always()
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: coverage-report
+          path: coverage.out
+          retention-days: 30
+
+      - name: Save artifacts
+        if: failure()
+        run: |
+          mkdir -p wr_actions
+          echo ${{ github.repository_owner }} > wr_actions/ghowner.txt
+          echo ${{ github.event.repository.name }} > wr_actions/ghrepo.txt
+          echo ${{ github.event.pull_request.number }} > wr_actions/prnumber.txt
+
+      - name: Upload artifacts
+        if: failure()
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: artifact
+          path: wr_actions
+
+      - name: Get run url
+        if: failure()
+        run: |
+          echo "gha_url=https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}" >> $GITHUB_ENV
+
+      - name: Send build failure comment
+        if: failure() && github.event.pull_request.head.repo.full_name == github.repository
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        env:
+          GHA_URL: ${{ env.gha_url }}
+        with:
+          result-encoding: string
+          script: |
+            const runUrl = process.env.GHA_URL;
+            github.rest.issues.createComment({
+              issue_number: ${{ github.event.pull_request.number }},
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `<b>🧪 Unit Test Failure</b> \n\n This pull request contains failing unit tests which need to be addressed [here](${runUrl}) .`
+            })
 
   build-matrix:
     name: '🔨 Cross-compile (${{ matrix.goos }}/${{ matrix.goarch }})'
