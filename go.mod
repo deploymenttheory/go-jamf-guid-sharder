@@ -3,7 +3,7 @@ module github.com/deploymenttheory/go-jamf-guid-sharder
 go 1.25.6
 
 require (
-	github.com/deploymenttheory/go-sdk-jamfpro-v2 v0.8.1
+	github.com/deploymenttheory/go-sdk-jamfpro-v2 v0.9.0
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.21.0
 	github.com/stretchr/testify v1.11.1
