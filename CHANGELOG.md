@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1](https://github.com/deploymenttheory/go-jamf-guid-sharder/compare/v1.0.0...v1.0.1) (2026-04-17)
+
+
+### Bug Fixes
+
+* : change shard-percentages and shard-sizes flags to StringSlice for better input handling ([b595f54](https://github.com/deploymenttheory/go-jamf-guid-sharder/commit/b595f54df4d663075341e9c8b0a60aaeb9539f4e))
+
 ## 1.0.0 (2026-03-11)
 
 
