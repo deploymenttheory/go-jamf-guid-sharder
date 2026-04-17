@@ -79,8 +79,8 @@ func init() {
 	shardCmd.Flags().String("group-id", "", "Jamf Pro group ID (required for *_group_membership source types)")
 	shardCmd.Flags().String("strategy", "", "Sharding strategy: round-robin | percentage | size | rendezvous")
 	shardCmd.Flags().Int("shard-count", 0, "Number of shards (required for round-robin and rendezvous)")
-	shardCmd.Flags().IntSlice("shard-percentages", []int{}, "Percentages summing to 100, e.g. 10,30,60 (percentage strategy)")
-	shardCmd.Flags().IntSlice("shard-sizes", []int{}, "Absolute shard sizes; use -1 as last element for remainder, e.g. 50,200,-1 (size strategy)")
+	shardCmd.Flags().StringSlice("shard-percentages", []string{}, "Percentages summing to 100, e.g. 10,30,60 (percentage strategy)")
+	shardCmd.Flags().StringSlice("shard-sizes", []string{}, "Absolute shard sizes; use -1 as last element for remainder, e.g. 50,200,-1 (size strategy)")
 	shardCmd.Flags().String("seed", "", "Seed for deterministic distribution (supported by all strategies)")
 	shardCmd.Flags().StringSlice("exclude-ids", []string{}, "IDs to completely exclude from all shards (comma-separated)")
 	shardCmd.Flags().String("reserved-ids", "",
@@ -143,13 +143,24 @@ func runShard(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("failed to parse configuration: %w", err)
 	}
 
-	// viper.Unmarshal can struggle with IntSlice flags bound from cobra; use
-	// GetIntSlice / GetStringSlice as a reliable fallback.
+	// viper.Unmarshal can struggle with StringSlice flags bound from cobra; use
+	// GetStringSlice + parseTrimmedIntSlice as a reliable fallback. This also
+	// handles user input like "25, 25, 50" where spaces follow commas.
 	if len(cfg.ShardPercentages) == 0 {
-		cfg.ShardPercentages = viper.GetIntSlice("shard_percentages")
+		raw := viper.GetStringSlice("shard_percentages")
+		parsed, err := parseTrimmedIntSlice(raw)
+		if err != nil {
+			return fmt.Errorf("invalid --shard-percentages value: %w", err)
+		}
+		cfg.ShardPercentages = parsed
 	}
 	if len(cfg.ShardSizes) == 0 {
-		cfg.ShardSizes = viper.GetIntSlice("shard_sizes")
+		raw := viper.GetStringSlice("shard_sizes")
+		parsed, err := parseTrimmedIntSlice(raw)
+		if err != nil {
+			return fmt.Errorf("invalid --shard-sizes value: %w", err)
+		}
+		cfg.ShardSizes = parsed
 	}
 	if len(cfg.ExcludeIDs) == 0 {
 		cfg.ExcludeIDs = viper.GetStringSlice("exclude_ids")
